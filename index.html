@@ -1,441 +1,997 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Пазл с заданиями | Easy for busy</title>
-    <!-- Подключение шрифтов -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Comfortaa:wght@400;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
-    <!-- Библиотека конфетти -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  />
+  <title>Пазл с заданиями — редактор и виджет</title>
+  <style>
+    :root{
+      --bg1:#0f172a;
+      --bg2:#172554;
+      --panel:rgba(255,255,255,.92);
+      --panelBorder:rgba(255,255,255,.28);
+      --text:#0f172a;
+      --muted:#475569;
+      --accent:#7c3aed;
+      --accent2:#06b6d4;
+      --shadow:0 14px 40px rgba(15,23,42,.18);
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      padding:0;
+      width:100%;
+      height:100%;
+      font-family:Inter,Segoe UI,Arial,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 20% 20%, rgba(124,58,237,.35), transparent 24%),
+        radial-gradient(circle at 80% 20%, rgba(6,182,212,.25), transparent 28%),
+        linear-gradient(135deg,var(--bg1),var(--bg2));
+      overflow:hidden;
+    }
+
+    html.widget-mode, body.widget-mode {
+      background: transparent !important;
+      overflow: hidden;
+    }
+
+    a{color:inherit}
+
+    .app{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+    }
+
+    .editor-shell{
+      width: 100%;
+      max-width: 1300px;
+      height: 100%;
+      max-height: 850px;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 16px;
+    }
+
+    .panel{
+      background:var(--panel);
+      backdrop-filter:blur(12px);
+      border:1px solid var(--panelBorder);
+      border-radius:24px;
+      box-shadow:var(--shadow);
+      display:flex;
+      flex-direction:column;
+      min-height: 0; 
+    }
+
+    .controls-header{
+      padding:16px 18px 10px;
+      border-bottom:1px solid rgba(15,23,42,.08);
+      flex: 0 0 auto;
+    }
+    .controls-header h1{ margin:0 0 6px; font-size:22px; line-height:1.1; }
+    .controls-header p{ margin:0; color:var(--muted); font-size:12px; line-height:1.35; }
+
+    .controls-scroll{
+      flex: 1 1 auto;
+      overflow-y: auto;
+      min-height: 0;
+      padding: 16px 18px;
+    }
+
+    .section{
+      margin-bottom:16px;
+      padding:14px;
+      border-radius:18px;
+      background:rgba(255,255,255,.72);
+      border:1px solid rgba(15,23,42,.06);
+    }
+    .section h3{ margin:0 0 10px; font-size:14px; }
+    .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+    .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+    .field label{ font-size:12px; color:var(--muted); font-weight:600; }
+
+    input[type="text"], input[type="url"], input[type="number"], select, textarea{
+      width:100%; border:1px solid rgba(15,23,42,.12); background:white;
+      border-radius:12px; padding:10px 12px; font-size:13px; color:var(--text);
+      outline:none; box-shadow: inset 0 1px 2px rgba(15,23,42,.04);
+    }
+    textarea{ resize:vertical; min-height:60px; }
+    input:focus, select:focus, textarea:focus{
+      border-color:rgba(124,58,237,.45);
+      box-shadow:0 0 0 4px rgba(124,58,237,.12);
+    }
     
-    <style>
-        :root {
-            --primary: #6C5CE7;
-            --primary-hover: #5b4bc4;
-            --bg: #f3f4f6;
-            --panel: #ffffff;
-            --text: #2d3436;
-            --shadow: 8px 8px 16px #d1d5db, -8px -8px 16px #ffffff;
-            --shadow-inset: inset 4px 4px 8px #d1d5db, inset -4px -4px 8px #ffffff;
-        }
+    input[type="range"]{ margin-top:6px; cursor:pointer; }
+    input[type="color"]{ padding:0; height:36px; cursor:pointer; border:none; border-radius:8px; overflow:hidden; }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Roboto', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+    .inline{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .check{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text); margin:4px 0; cursor:pointer;}
 
-        /* --- СТИЛИ РЕДАКТОРА --- */
-        #editor-view { display: flex; flex-direction: column; min-height: 100vh; padding: 20px; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .header h1 { font-family: 'Comfortaa', cursive; color: var(--primary); text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
-        
-        .editor-container { display: flex; gap: 20px; flex: 1; max-width: 1600px; margin: 0 auto; width: 100%; height: calc(100vh - 150px); }
-        
-        .settings-panel { 
-            width: 400px; background: var(--panel); border-radius: 20px; padding: 20px; 
-            box-shadow: var(--shadow); overflow-y: auto; display: flex; flex-direction: column; gap: 15px; 
-        }
-        
-        .preview-panel { 
-            flex: 1; background: var(--panel); border-radius: 20px; padding: 20px; 
-            box-shadow: var(--shadow); display: flex; flex-direction: column; 
-        }
+    .btn{
+      border:none; outline:none; cursor:pointer; padding:10px 14px; border-radius:14px;
+      font-weight:700; font-size:13px; transition:.2s ease; box-shadow:0 8px 20px rgba(15,23,42,.10);
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn:active{transform:translateY(0)}
 
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-weight: bold; font-size: 0.9em; color: #555; }
-        input[type="text"], input[type="color"], select { 
-            padding: 10px; border: none; border-radius: 10px; background: var(--bg); box-shadow: var(--shadow-inset); 
-            font-family: inherit; width: 100%; outline: none; transition: 0.3s;
-        }
-        input[type="text"]:focus { box-shadow: inset 6px 6px 12px #d1d5db, inset -6px -6px 12px #ffffff, 0 0 0 2px var(--primary); }
-        
-        .pair-container { background: #f9f9f9; padding: 10px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px; }
-        .pair-container h4 { margin-bottom: 5px; font-size: 0.85em; color: var(--primary); }
+    .btn-primary{ color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2)); }
 
-        button { 
-            padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 12px; 
-            font-weight: bold; cursor: pointer; box-shadow: 4px 4px 10px rgba(108, 92, 231, 0.4); 
-            transition: 0.2s; font-family: 'Comfortaa', cursive;
-        }
-        button:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 6px 6px 12px rgba(108, 92, 231, 0.5); }
-        button:active { transform: translateY(0); }
+    .preview-header{
+      flex:0 0 auto; padding:12px 16px; display:flex; align-items:center;
+      justify-content:space-between; border-bottom:1px solid rgba(15,23,42,.08);
+    }
+    .preview-header strong{ font-size:14px; }
 
-        .preview-wrapper { 
-            flex: 1; border-radius: 15px; overflow: hidden; box-shadow: var(--shadow-inset); 
-            position: relative; background: #eee; 
-        }
-        iframe { width: 100%; height: 100%; border: none; }
+    .preview-frame-wrap{
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 16px;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,.6) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.6) 75%),
+        linear-gradient(45deg, rgba(255,255,255,.6) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.6) 75%),
+        #e2e8f0;
+      background-size:20px 20px;
+      background-position:0 0, 10px 10px;
+      border-radius: 0 0 24px 24px;
+      display: flex;
+    }
 
-        /* Модальное окно */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; padding: 30px; border-radius: 20px; width: 600px; max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; }
-        .modal-content textarea { width: 100%; height: 150px; margin: 15px 0; padding: 10px; border-radius: 10px; border: 1px solid #ccc; font-family: monospace; resize: none; }
-        .close-btn { background: #ff7675; margin-left: 10px; }
-        .close-btn:hover { background: #d63031; }
+    iframe.preview-frame{
+      flex: 1 1 auto;
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      box-shadow: inset 0 0 0 1px rgba(15,23,42,.12);
+    }
 
-        /* Футер */
-        .footer { text-align: center; margin-top: 15px; font-size: 0.85em; color: #7f8c8d; }
-        .footer a { color: var(--primary); text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; margin: 0 5px; }
-        .footer a:hover { text-decoration: underline; }
-        .footer img { width: 16px; height: 16px; }
+    .tasks-list{ display:flex; flex-direction:column; gap:10px; max-height:260px; overflow:auto; padding-right:4px; }
+    .task-item{ padding:10px; border-radius:14px; background:#fff; border:1px solid rgba(15,23,42,.08); }
+    .task-item-title{ font-size:12px; font-weight:700; margin-bottom:8px; color:#334155; }
+    .footer{ padding:12px 16px 14px; border-top:1px solid rgba(15,23,42,.08); font-size:11px; color:#64748b; flex: 0 0 auto;}
 
-        /* --- СТИЛИ ВИДЖЕТА --- */
-        #widget-view { display: none; width: 100vw; height: 100vh; background: transparent; position: relative; overflow: hidden; }
-        
-        .game-container { 
-            width: 100%; height: 100%; position: relative; 
-            max-width: calc(100vh * 16 / 9); max-height: calc(100vw * 9 / 16);
-            margin: auto; top: 50%; transform: translateY(-50%);
-        }
+    #widgetRoot{ width:100%; height:100%; }
 
-        .board-area { 
-            position: absolute; left: 25%; top: 15%; width: 50%; height: 70%;
-            background: rgba(255, 255, 255, 0.2); border-radius: 10px;
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-            backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.18);
-            transition: all 1s ease;
-        }
+    .widget-stage{
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      overflow: hidden;
+      transition: background 0.3s ease;
+    }
 
-        .board-glow { box-shadow: 0 0 40px 10px rgba(255, 215, 0, 0.8) !important; border: none !important; }
-        .full-image-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background-size: 100% 100%; border-radius: 10px; opacity: 0; transition: opacity 1.5s ease; z-index: 100; pointer-events: none;
-        }
+    .widget-scale{
+      position: relative;
+      width: 1200px;
+      height: 675px;
+      flex-shrink: 0; 
+      transform-origin: center center;
+    }
 
-        .pool-left { position: absolute; left: 2%; top: 5%; width: 21%; height: 90%; }
-        .pool-right { position: absolute; right: 2%; top: 5%; width: 21%; height: 90%; }
+    .puzzle-scene{
+      position:absolute; inset:0; display:grid; grid-template-columns:180px 1fr 180px;
+      gap:16px; padding:18px; pointer-events:auto;
+    }
 
-        .board-slot { position: absolute; display: flex; justify-content: center; align-items: center; text-align: center; }
-        .board-slot svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-        .board-slot path { fill: rgba(255,255,255,0.4); stroke: #ccc; stroke-width: 2px; stroke-dasharray: 5,5; }
-        .board-task-text { position: relative; z-index: 2; padding: 5px; word-wrap: break-word; user-select: none; max-width: 80%; max-height: 80%; overflow: hidden; font-size: clamp(10px, 1.5vw, 16px); }
+    .side-tray{
+      position:relative; border-radius:24px; background:linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.08));
+      border:1px solid rgba(255,255,255,.22); box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 16px 40px rgba(15,23,42,.16);
+      backdrop-filter:blur(8px); overflow:hidden;
+    }
 
-        .puzzle-piece { 
-            position: absolute; display: flex; justify-content: center; align-items: center; text-align: center;
-            cursor: grab; filter: drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); transition: transform 0.1s;
-            transform-origin: center; touch-action: none;
-        }
-        .puzzle-piece:active { cursor: grabbing; transform: scale(1.05); filter: drop-shadow(5px 8px 10px rgba(0,0,0,0.5)); z-index: 50 !important; }
-        .puzzle-piece.snapped { cursor: default; transform: none !important; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); z-index: 10 !important; }
-        
-        .puzzle-piece svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-        .puzzle-piece image { pointer-events: none; }
-        .puzzle-piece path.stroke { fill: none; stroke: rgba(255,255,255,0.5); stroke-width: 1px; }
-        
-        .puzzle-answer-text { position: relative; z-index: 2; padding: 5px; word-wrap: break-word; user-select: none; pointer-events: none; max-width: 80%; max-height: 80%; overflow: hidden; border-radius: 5px; font-size: clamp(10px, 1.5vw, 16px); }
+    .tray-inner{ position:relative; width:100%; height:100%; overflow:hidden; }
 
-        @keyframes pulse-glow {
-            0% { filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px #74b9ff); }
-            50% { filter: drop-shadow(0 0 15px #fff) drop-shadow(0 0 30px #0984e3); }
-            100% { filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); }
-        }
-        .glow-effect { animation: pulse-glow 0.8s ease-out; }
+    .board-shell{
+      position:relative; border-radius:30px; background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.08));
+      border:1px solid rgba(255,255,255,.24); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 20px 50px rgba(15,23,42,.2);
+      overflow:hidden; backdrop-filter:blur(10px);
+    }
 
-        .hidden { display: none !important; }
-    </style>
+    .board-glow{
+      position:absolute; inset:-30px;
+      background:radial-gradient(circle at 50% 40%, rgba(124,58,237,.22), transparent 45%), radial-gradient(circle at 50% 65%, rgba(6,182,212,.18), transparent 45%);
+      pointer-events:none;
+    }
+
+    .board{
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      border-radius:28px; background:rgba(255,255,255,.07);
+      box-shadow: inset 0 3px 12px rgba(255,255,255,.15), inset 0 -10px 30px rgba(15,23,42,.12);
+      overflow:visible; z-index:1;
+    }
+
+    .piece-slot{ position:absolute; overflow:visible; background:transparent; z-index:1; }
+    .piece-slot.correct{ background:transparent; box-shadow:none; }
+
+    .slot-svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:0; transition:opacity .35s ease; }
+
+    .text-wrap-center{
+      position:absolute; transform:translate(-50%, -50%); display:flex;
+      align-items:center; justify-content:center; pointer-events:none; overflow:hidden; z-index:2;
+    }
+
+    .text-inner{
+      display:inline-flex; align-items:center; justify-content:center; text-align:center;
+      padding:6px 12px; font-weight:700; line-height:1.15; color:#fff;
+      text-shadow:0 2px 10px rgba(0,0,0,.28); word-break:break-word; max-width:100%;
+      max-height:100%; overflow:hidden; white-space:normal; transition:opacity .3s ease;
+    }
+    .text-inner.has-bg{ background:rgba(15,23,42,.45); border-radius:12px; backdrop-filter:blur(4px); }
+    .text-inner.stroke{ -webkit-text-stroke:1px rgba(15,23,42,.5); paint-order:stroke fill; }
+
+    .pieces-layer{ position:absolute; inset:0; z-index:60; pointer-events:none; }
+
+    .piece{
+      position:absolute; user-select:none; touch-action:none; cursor:grab;
+      transform-origin: top left;
+      transition: left .25s ease, top .25s ease, transform .25s ease, filter .2s ease, opacity .25s ease;
+      z-index:70; pointer-events:auto; overflow:visible;
+    }
+
+    .piece.dragging{
+      cursor:grabbing;
+      z-index:9999 !important;
+      transition: filter .1s ease !important;
+      filter:drop-shadow(0 20px 28px rgba(15,23,42,.34));
+    }
+
+    .piece.correct{ pointer-events:none; }
+    .piece.shine{ animation:pieceGlow .7s ease; }
+
+    @keyframes pieceGlow{
+      0%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
+      35%{filter:drop-shadow(0 0 26px rgba(255,255,255,.85))}
+      100%{filter:drop-shadow(0 12px 16px rgba(15,23,42,.30))}
+    }
+
+    .piece-svg{ position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; filter:drop-shadow(0 12px 16px rgba(15,23,42,.30)); transition:opacity .35s ease; }
+    .piece.clean .text-wrap-center{ opacity:0; }
+    .piece.clean .piece-svg .piece-stroke{ opacity:0; }
+
+    .complete-overlay{ position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .5s ease; z-index:25; }
+    .complete-overlay.show{ opacity:1; }
+
+    .full-image{
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      border-radius:28px; background-size:cover;
+      background-position:center; box-shadow: 0 0 0 2px rgba(255,255,255,.35), 0 0 25px rgba(255,255,255,.55), 0 0 60px rgba(124,58,237,.35);
+      overflow:hidden;
+    }
+    .full-image::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(255,255,255,.18), transparent 35%, rgba(255,255,255,.08)); pointer-events:none; }
+
+    .victory-text{
+      position:absolute; left:50%; top:30px; transform:translateX(-50%); padding:12px 18px;
+      border-radius:999px; background:rgba(255,255,255,.16); color:#fff; font-weight:900;
+      letter-spacing:.2px; text-shadow:0 2px 10px rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.24);
+      box-shadow:0 10px 30px rgba(15,23,42,.22); backdrop-filter:blur(8px); white-space:nowrap;
+    }
+
+    .victory-text-top{
+      position:absolute;
+      left:50%;
+      top:48px;
+      transform:translateX(-50%);
+      padding:12px 18px;
+      border-radius:999px;
+      background:rgba(255,255,255,.16);
+      color:#fff;
+      font-weight:900;
+      letter-spacing:.2px;
+      text-shadow:0 2px 10px rgba(0,0,0,.3);
+      border:1px solid rgba(255,255,255,.24);
+      box-shadow:0 10px 30px rgba(15,23,42,.22);
+      backdrop-filter:blur(8px);
+      white-space:nowrap;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .5s ease;
+      z-index:100000;
+    }
+
+    .victory-text-top.show{
+      opacity:1;
+    }
+
+    .confetti{
+      position:absolute; width:10px; height:16px; opacity:.95; top:-20px; border-radius:2px;
+      animation:confettiFall linear forwards; z-index:200; pointer-events:none;
+    }
+    @keyframes confettiFall{ to{ transform:translateY(760px) rotate(780deg); opacity:1; } }
+
+    @media (max-width:980px){
+      .editor-shell{ grid-template-columns:1fr; height:100%; max-height: none; }
+      .controls{ min-height:400px; }
+    }
+  </style>
 </head>
 <body>
+  <div id="app" class="app"></div>
 
-    <div id="editor-view">
-        <div class="header"><h1>3D Пазл Конструктор</h1></div>
-        <div class="editor-container">
-            <div class="settings-panel" id="settings">
-                <div class="form-group">
-                    <label>Ссылка на картинку (прямая):</label>
-                    <input type="text" id="img-url" value="https://cdn.creazilla.com/photos/1415199/carving-halloween-pumpkin-photo-md.jpeg">
-                </div>
-                <div class="form-group">
-                    <label>Количество деталей:</label>
-                    <select id="grid-size">
-                        <option value="3x3">Крупные (9 деталей)</option>
-                        <option value="4x3" selected>Средние (12 деталей)</option>
-                        <option value="5x3">Мелкие (15 деталей)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Шрифт текста:</label>
-                    <select id="font-family">
-                        <option value="'Roboto', sans-serif">Roboto (Классический)</option>
-                        <option value="'Comfortaa', cursive" selected>Comfortaa (Круглый)</option>
-                        <option value="'Caveat', cursive">Caveat (Рукописный)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Цвет текста:</label>
-                    <input type="color" id="text-color" value="#FFFFFF">
-                </div>
-                <div class="form-group">
-                    <label>Фон под текстом ответа (rgba/hex):</label>
-                    <input type="text" id="text-bg" value="rgba(0, 0, 0, 0.5)">
-                </div>
-                <div class="form-group">
-                    <label>Обводка текста ответа (CSS text-shadow):</label>
-                    <input type="text" id="text-outline" value="1px 1px 2px black">
-                </div>
-                <hr style="border:0; border-top:1px solid #ccc; margin: 10px 0;">
-                <label>Задания и Ответы:</label>
-                <div id="qa-container"></div>
-                <button onclick="openModal()" style="margin-top: 10px;">Получить код iframe</button>
+  <script>
+    const DEFAULT_CONFIG = {
+      imageUrl: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80",
+      difficulty: "medium",
+      fontFamily: "Arial",
+      fontSizeTask: 18,
+      fontSizeAnswer: 20,
+      textBgTask: true,
+      textBgAnswer: true,
+      textStrokeAnswer: false,
+      textStrokeTask: false,
+      widgetBgColor: "#172554", // Дефолтный цвет фона
+      widgetBgOpacity: 0,       // По умолчанию прозрачно на 100%
+      victoryText: "Молодец! Пазл собран!",
+      correctSound: true,
+      winSound: true,
+      tasks: []
+    };
+
+    const DIFFICULTIES = {
+      easy: { label: "Крупные", cols: 3, rows: 2 },
+      medium: { label: "Средние", cols: 4, rows: 3 },
+      hard: { label: "Мелкие", cols: 5, rows: 4 }
+    };
+
+    const FONT_OPTIONS = [
+      "Arial", "Verdana", "Trebuchet MS", "Tahoma", "Georgia", 
+      "Times New Roman", "Courier New", "Comic Sans MS", "Impact", "Segoe UI"
+    ];
+
+    function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+    function escapeHtml(str=""){
+      return String(str)
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
+    }
+
+    function hexToRgba(hex, opacityPct) {
+      let h = hex.replace(/^#/, '');
+      if (h.length === 3) h = h.split('').map(x => x + x).join('');
+      const r = parseInt(h.substring(0, 2), 16) || 0;
+      const g = parseInt(h.substring(2, 4), 16) || 0;
+      const b = parseInt(h.substring(4, 6), 16) || 0;
+      return `rgba(${r}, ${g}, ${b}, ${opacityPct / 100})`;
+    }
+
+    function encodeConfig(obj){
+      return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+    }
+
+    function decodeConfig(raw){
+      try{ return JSON.parse(decodeURIComponent(escape(atob(raw)))); }
+      catch(e){ return null; }
+    }
+
+    function getModeAndConfig(){
+      const url = new URL(window.location.href);
+      const raw = url.searchParams.get("config");
+      if(!raw) return { mode:"editor", config:buildConfigWithTasks(deepClone(DEFAULT_CONFIG)) };
+      const cfg = decodeConfig(raw);
+      if(!cfg) return { mode:"editor", config:buildConfigWithTasks(deepClone(DEFAULT_CONFIG)) };
+      return { mode:"widget", config:normalizeConfig(cfg) };
+    }
+
+    function buildConfigWithTasks(config){
+      const diff = DIFFICULTIES[config.difficulty] || DIFFICULTIES.medium;
+      const total = diff.cols * diff.rows;
+      const existing = Array.isArray(config.tasks) ? config.tasks : [];
+      config.tasks = Array.from({length: total}, (_,i)=>({
+        task: existing[i]?.task || `Задание ${i+1}`,
+        answer: existing[i]?.answer || `Ответ ${i+1}`
+      }));
+      return config;
+    }
+
+    function normalizeConfig(config){
+      const merged = Object.assign({}, DEFAULT_CONFIG, config || {});
+      merged.difficulty = DIFFICULTIES[merged.difficulty] ? merged.difficulty : "medium";
+      merged.fontFamily = FONT_OPTIONS.includes(merged.fontFamily) ? merged.fontFamily : "Arial";
+      merged.fontSizeTask = +merged.fontSizeTask || 18;
+      merged.fontSizeAnswer = +merged.fontSizeAnswer || 20;
+      merged.widgetBgColor = merged.widgetBgColor || "#172554";
+      merged.widgetBgOpacity = merged.widgetBgOpacity !== undefined ? +merged.widgetBgOpacity : 0;
+      merged.textBgTask = !!merged.textBgTask;
+      merged.textBgAnswer = !!merged.textBgAnswer;
+      merged.textStrokeTask = !!merged.textStrokeTask;
+      merged.textStrokeAnswer = !!merged.textStrokeAnswer;
+      merged.correctSound = merged.correctSound !== false;
+      merged.winSound = merged.winSound !== false;
+      return buildConfigWithTasks(merged);
+    }
+
+    function makeSelfPreviewUrl(config){
+      const url = new URL(window.location.href);
+      url.search = ""; url.hash = "";
+      url.searchParams.set("config", encodeConfig(config));
+      return url.toString();
+    }
+
+    function createEditor(config){
+      document.documentElement.classList.remove("widget-mode");
+      document.body.classList.remove("widget-mode");
+      const app = document.getElementById("app");
+      let state = normalizeConfig(config);
+
+      app.innerHTML = `
+        <div class="editor-shell">
+          <div class="controls panel">
+            <div class="controls-header">
+              <h1>Пазл с заданиями</h1>
+              <p>Настройки передаются через URL-параметр <code>?config=...</code>.</p>
             </div>
-            <div class="preview-panel">
-                <label style="margin-bottom: 10px;">Предпросмотр (в реальном времени):</label>
-                <div class="preview-wrapper">
-                    <iframe id="preview-frame"></iframe>
-                </div>
+            <div class="controls-scroll" id="controlsScroll"></div>
+            <div class="footer">Автор: Алёна Кóденцева | Easy for busy</div>
+          </div>
+          <div class="preview panel">
+            <div class="preview-header">
+              <strong>Предпросмотр</strong>
+              <div class="inline"><button class="btn btn-primary" id="btnGetCode">Скопировать iframe</button></div>
             </div>
-        </div>
-        <div class="footer">
-            Автор: Кóденцева Алёна, блог Просто для учителя | Easy for busy <br>
-            <a href="https://t.me/easyfrbusy" target="_blank"><img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="TG"> Telegram</a>
-            <a href="https://vk.com/easyfrbusy" target="_blank"><img src="https://upload.wikimedia.org/wikipedia/commons/2/21/VK.com-logo.svg" alt="VK"> ВКонтакте</a>
-        </div>
-    </div>
-
-    <div id="code-modal" class="modal">
-        <div class="modal-content">
-            <h2 style="font-family: 'Comfortaa', cursive; color: var(--primary);">Ваш код виджета</h2>
-            <p style="margin-top:10px; font-size:0.9em; color:#555;">Скопируйте этот код и вставьте его в Genially (Insert -> Other) или Miro (Embed code).</p>
-            <textarea id="iframe-code" readonly></textarea>
-            <div>
-                <button onclick="copyCode()">Скопировать код</button>
-                <button class="close-btn" onclick="closeModal()">Закрыть</button>
+            <div class="preview-frame-wrap">
+              <iframe class="preview-frame" id="previewFrame" allow="autoplay; clipboard-write"></iframe>
             </div>
+          </div>
         </div>
-    </div>
+      `;
 
-    <div id="widget-view">
-        <div class="game-container" id="game-container">
-            <div class="pool-left" id="pool-left"></div>
-            <div class="board-area" id="board-area"><div class="full-image-overlay" id="full-image"></div></div>
-            <div class="pool-right" id="pool-right"></div>
+      document.getElementById("controlsScroll").innerHTML = `
+        <div class="section">
+          <h3>1. Картинка и нарезка</h3>
+          <div class="field"><label>Ссылка на изображение</label><input id="imageUrl" type="url" value="${escapeHtml(state.imageUrl)}"/></div>
+          <div class="grid-2">
+            <div class="field"><label>Сложность</label><select id="difficulty">${Object.entries(DIFFICULTIES).map(([k,v])=>`<option value="${k}" ${state.difficulty===k?"selected":""}>${v.label}</option>`).join("")}</select></div>
+            <div class="field"><label>Текст победы</label><input id="victoryText" type="text" value="${escapeHtml(state.victoryText)}" /></div>
+          </div>
         </div>
-    </div>
+        <div class="section">
+          <h3>2. Оформление фона и текста</h3>
+          <div class="grid-2">
+            <div class="field"><label>Цвет фона (всего поля)</label><input id="widgetBgColor" type="color" value="${state.widgetBgColor}"/></div>
+            <div class="field"><label>Непрозрачность: <span id="bgOpacityLabel">${state.widgetBgOpacity}%</span></label><input id="widgetBgOpacity" type="range" min="0" max="100" value="${state.widgetBgOpacity}"/></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Шрифт</label><select id="fontFamily">${FONT_OPTIONS.map(f=>`<option value="${escapeHtml(f)}" ${state.fontFamily===f?"selected":""}>${f}</option>`).join("")}</select></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Размер (задания)</label><input id="fontSizeTask" type="number" min="12" max="36" value="${state.fontSizeTask}"/></div>
+            <div class="field"><label>Размер (ответы)</label><input id="fontSizeAnswer" type="number" min="12" max="36" value="${state.fontSizeAnswer}"/></div>
+          </div>
+          <div class="inline" style="margin-top:6px;">
+            <label class="check"><input id="textBgTask" type="checkbox" ${state.textBgTask?"checked":""}/> Фон у заданий</label>
+            <label class="check"><input id="textBgAnswer" type="checkbox" ${state.textBgAnswer?"checked":""}/> Фон у ответов</label>
+          </div>
+        </div>
+        <div class="section"><h3>3. Звук</h3>
+          <div class="inline">
+            <label class="check"><input id="correctSound" type="checkbox" ${state.correctSound?"checked":""}/> Правильно</label>
+            <label class="check"><input id="winSound" type="checkbox" ${state.winSound?"checked":""}/> Победа</label>
+          </div>
+        </div>
+        <div class="section"><h3>4. Задания и ответы</h3><div class="tasks-list" id="tasksList"></div></div>
+      `;
 
-    <script>
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        function playSound(type) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            if (type === 'snap') {
-                const osc = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
-                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                osc.connect(gainNode).connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.1);
-            } else if (type === 'win') {
-                [440, 554.37, 659.25, 880].forEach((freq, i) => {
-                    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.value = freq;
-                    gain.gain.setValueAtTime(0, audioCtx.currentTime + i * 0.1);
-                    gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + i * 0.1 + 0.05);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.5);
-                    osc.connect(gain).connect(audioCtx.destination);
-                    osc.start(audioCtx.currentTime + i * 0.1);
-                    osc.stop(audioCtx.currentTime + i * 0.1 + 0.6);
-                });
-            }
-        }
+      const els = {
+        imageUrl: document.getElementById("imageUrl"), difficulty: document.getElementById("difficulty"),
+        victoryText: document.getElementById("victoryText"), fontFamily: document.getElementById("fontFamily"),
+        fontSizeTask: document.getElementById("fontSizeTask"), fontSizeAnswer: document.getElementById("fontSizeAnswer"),
+        textBgTask: document.getElementById("textBgTask"), textBgAnswer: document.getElementById("textBgAnswer"),
+        widgetBgColor: document.getElementById("widgetBgColor"), widgetBgOpacity: document.getElementById("widgetBgOpacity"),
+        bgOpacityLabel: document.getElementById("bgOpacityLabel"), correctSound: document.getElementById("correctSound"), 
+        winSound: document.getElementById("winSound"), tasksList: document.getElementById("tasksList"), 
+        previewFrame: document.getElementById("previewFrame"), btnGetCode: document.getElementById("btnGetCode")
+      };
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const configParam = urlParams.get('config');
+      els.widgetBgOpacity.addEventListener("input", (e) => {
+        els.bgOpacityLabel.textContent = e.target.value + "%";
+      });
 
-        if (configParam) {
-            document.getElementById('editor-view').classList.add('hidden');
-            document.getElementById('widget-view').style.display = 'block';
-            try {
-                const config = JSON.parse(decodeURIComponent(atob(configParam)));
-                initWidget(config);
-            } catch(e) { console.error("Ошибка чтения настроек", e); }
-        } else {
-            initEditor();
-        }
+      function renderTasks(){
+        els.tasksList.innerHTML = state.tasks.map((item,i)=>`
+          <div class="task-item">
+            <div class="task-item-title">Пазлинка ${i+1}</div>
+            <div class="field"><label>Задание</label><textarea data-type="task" data-index="${i}">${escapeHtml(item.task)}</textarea></div>
+            <div class="field" style="margin:0"><label>Ответ</label><textarea data-type="answer" data-index="${i}">${escapeHtml(item.answer)}</textarea></div>
+          </div>`).join("");
+        [...els.tasksList.querySelectorAll("textarea")].forEach(t=>{
+          t.addEventListener("input", e=>{ state.tasks[+e.target.dataset.index][e.target.dataset.type] = e.target.value; updatePreview(); });
+        });
+      }
 
-        let updateTimeout;
-        function initEditor() {
-            document.getElementById('grid-size').addEventListener('change', generateQAFields);
-            document.querySelectorAll('#settings input, #settings select').forEach(input => input.addEventListener('input', scheduleUpdate));
-            generateQAFields();
-        }
+      function readControls(){
+        state.imageUrl = els.imageUrl.value.trim(); state.difficulty = els.difficulty.value;
+        state.victoryText = els.victoryText.value.trim() || DEFAULT_CONFIG.victoryText;
+        state.fontFamily = els.fontFamily.value; state.fontSizeAnswer = +els.fontSizeAnswer.value;
+        state.fontSizeTask = +els.fontSizeTask.value; state.textBgTask = els.textBgTask.checked;
+        state.textBgAnswer = els.textBgAnswer.checked; state.correctSound = els.correctSound.checked;
+        state.winSound = els.winSound.checked;
+        state.widgetBgColor = els.widgetBgColor.value; state.widgetBgOpacity = +els.widgetBgOpacity.value;
+        state = normalizeConfig(state);
+      }
 
-        function generateQAFields() {
-            const container = document.getElementById('qa-container');
-            const [cols, rows] = document.getElementById('grid-size').value.split('x').map(Number);
-            const count = cols * rows;
-            const currentTasks = Array.from(document.querySelectorAll('.task-input')).map(el => el.value);
-            const currentAnswers = Array.from(document.querySelectorAll('.ans-input')).map(el => el.value);
-            container.innerHTML = '';
-            for (let i = 0; i < count; i++) {
-                container.innerHTML += `
-                    <div class="pair-container">
-                        <h4>Пазлинка ${i+1}</h4>
-                        <div class="form-group">
-                            <input type="text" class="task-input" placeholder="Задание (на доске)" value="${currentTasks[i] || `Задание ${i+1}`}">
-                            <input type="text" class="ans-input" placeholder="Ответ (на пазлинке)" value="${currentAnswers[i] || `Ответ ${i+1}`}">
-                        </div>
-                    </div>`;
-            }
-            container.querySelectorAll('input').forEach(input => input.addEventListener('input', scheduleUpdate));
-            scheduleUpdate();
-        }
+      function updatePreview(){
+        readControls();
+        els.previewFrame.src = makeSelfPreviewUrl(state);
+      }
 
-        function scheduleUpdate() { clearTimeout(updateTimeout); updateTimeout = setTimeout(updatePreview, 500); }
+      ["input","change"].forEach(ev=>{
+        [els.imageUrl, els.difficulty, els.victoryText, els.fontFamily, els.fontSizeTask, els.fontSizeAnswer,
+         els.textBgTask, els.textBgAnswer, els.correctSound, els.winSound, els.widgetBgColor, els.widgetBgOpacity].forEach(el=>{
+          el.addEventListener(ev, ()=>{
+            const oldCount = state.tasks.length;
+            readControls();
+            if(oldCount !== state.tasks.length) renderTasks();
+            updatePreview();
+          });
+        });
+      });
+
+      els.btnGetCode.addEventListener("click", async ()=>{ 
+        readControls(); 
+        const src = makeSelfPreviewUrl(state);
+        const iframeStr = `<iframe src="${src}" width="1200" height="675" style="width:100%;max-width:1200px;aspect-ratio:16/9;border:none;background:transparent;" allow="autoplay" loading="lazy"></iframe>`;
         
-        function getBaseUrl() { return window.location.href.split('?')[0]; }
+        let copied = false;
 
-        function getCurrentConfig() {
-            const [cols, rows] = document.getElementById('grid-size').value.split('x').map(Number);
-            // *** ИСПРАВЛЕНИЕ CORS: Оборачиваем URL в прокси ***
-            const originalUrl = document.getElementById('img-url').value;
-            const proxiedUrl = `https://corsproxy.io/?${encodeURIComponent(originalUrl)}`;
-
-            return {
-                img: proxiedUrl, // Используем обработанную ссылку
-                cols: cols, rows: rows,
-                font: document.getElementById('font-family').value,
-                color: document.getElementById('text-color').value,
-                textBg: document.getElementById('text-bg').value,
-                textOutline: document.getElementById('text-outline').value,
-                tasks: Array.from(document.querySelectorAll('.task-input')).map(el => el.value),
-                answers: Array.from(document.querySelectorAll('.ans-input')).map(el => el.value)
-            };
+        // Попытка 1: Современный API (может блокироваться в iframe)
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(iframeStr);
+            copied = true;
+          } catch (e) {}
         }
 
-        function updatePreview() {
-            const config = getCurrentConfig();
-            const base64Config = btoa(encodeURIComponent(JSON.stringify(config)));
-            document.getElementById('preview-frame').src = `${getBaseUrl()}?config=${base64Config}`;
+        // Попытка 2: Старый надежный метод (для iframe)
+        if (!copied) {
+          try {
+            const textArea = document.createElement("textarea");
+            textArea.value = iframeStr;
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            copied = document.execCommand('copy');
+            document.body.removeChild(textArea);
+          } catch (e) {}
         }
 
-        function openModal() {
-            const config = getCurrentConfig();
-            const base64Config = btoa(encodeURIComponent(JSON.stringify(config)));
-            const fullUrl = `${getBaseUrl()}?config=${base64Config}`;
-            document.getElementById('iframe-code').value = `<iframe src="${fullUrl}" width="1200" height="675" style="border:none; background:transparent;" allow="autoplay" allowfullscreen></iframe>`;
-            document.getElementById('code-modal').style.display = 'flex';
+        if (copied) {
+          els.btnGetCode.textContent = "Скопировано!";
+          setTimeout(() => els.btnGetCode.textContent = "Скопировать iframe", 2000);
+        } else {
+          // Попытка 3: Если браузер блокирует всё, даем скопировать вручную
+          prompt("Браузер заблокировал авто-копирование. Выделите и скопируйте код вручную (Ctrl+C):", iframeStr);
+        }
+      });
+
+      renderTasks(); updatePreview();
+    }
+
+    async function createWidget(config){
+      document.documentElement.classList.add("widget-mode");
+      document.body.classList.add("widget-mode");
+      const app = document.getElementById("app");
+      app.innerHTML = `<div id="widgetRoot"><div style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;color:white;font-weight:600;font-size:14px;letter-spacing:1px;opacity:0.7;">Загрузка пазла...</div></div>`;
+      await renderPuzzleWidget(document.getElementById("widgetRoot"), normalizeConfig(config));
+    }
+
+    async function renderPuzzleWidget(root, config){
+      const imgDims = await new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => resolve({ w: img.naturalWidth || 720, h: img.naturalHeight || 480 });
+        img.onerror = () => resolve({ w: 720, h: 480 });
+        img.src = config.imageUrl;
+      });
+
+      const SCENE_PAD = 18;
+      const SCENE_GAP = 16;
+      const TRAY_W = 180;
+      const TRAY_H = 675 - SCENE_PAD * 2;
+      
+      const SHELL_W = 1200 - (SCENE_PAD * 2 + TRAY_W * 2 + SCENE_GAP * 2);
+      const SHELL_H = TRAY_H;
+
+      const imgRatio = imgDims.w / imgDims.h;
+      const shellRatio = SHELL_W / SHELL_H;
+      
+      let boardW, boardH;
+      
+      if (imgRatio > shellRatio) {
+        boardW = SHELL_W;
+        boardH = SHELL_W / imgRatio;
+      } else {
+        boardH = SHELL_H;
+        boardW = SHELL_H * imgRatio;
+      }
+
+      config.boardWidth = boardW;
+      config.boardHeight = boardH;
+
+      const diff = DIFFICULTIES[config.difficulty];
+      const cols = diff.cols; const rows = diff.rows; const total = cols * rows;
+
+      root.innerHTML = `
+        <div class="widget-stage">
+          <div class="widget-scale" id="widgetScale">
+            <div class="puzzle-scene">
+              <div class="side-tray"><div class="tray-inner" id="leftTray"></div></div>
+              <div class="board-shell" id="boardShell">
+                <div class="board-glow"></div>
+                <div class="board" id="board"></div>
+                <div class="complete-overlay" id="completeOverlay">
+                  <div class="full-image" id="fullImage"></div>
+                </div>
+              </div>
+              <div class="side-tray"><div class="tray-inner" id="rightTray"></div></div>
+            </div>
+            <div class="pieces-layer" id="piecesLayer"></div>
+            <div class="victory-text-top" id="victoryTextTop">${escapeHtml(config.victoryText)}</div>
+          </div>
+        </div>
+      `;
+
+      const stage = root.querySelector(".widget-stage");
+      stage.style.backgroundColor = hexToRgba(config.widgetBgColor, config.widgetBgOpacity);
+
+      const scaleWrap = document.getElementById("widgetScale");
+      const board = document.getElementById("board");
+      const leftTray = document.getElementById("leftTray");
+      const rightTray = document.getElementById("rightTray");
+      const piecesLayer = document.getElementById("piecesLayer");
+      const completeOverlay = document.getElementById("completeOverlay");
+      const fullImage = document.getElementById("fullImage");
+      const victoryTextTop = document.getElementById("victoryTextTop");
+
+      fullImage.style.width = config.boardWidth + "px";
+      fullImage.style.height = config.boardHeight + "px";
+      fullImage.style.backgroundImage = `url("${config.imageUrl}")`;
+
+      board.style.width = config.boardWidth + "px";
+      board.style.height = config.boardHeight + "px";
+
+      function fitScale(){
+        const pw = root.clientWidth; const ph = root.clientHeight;
+        const scale = Math.min(pw / 1200, ph / 675);
+        scaleWrap.style.transform = `scale(${scale})`;
+      }
+      window.addEventListener("resize", fitScale); fitScale();
+
+      const cellW = config.boardWidth / cols;
+      const cellH = config.boardHeight / rows;
+      const radius = Math.min(cellW, cellH) * 0.18;
+
+      const slots = []; const pieces = []; const pieceModels = [];
+      const placed = new Set(); let correctCount = 0;
+
+      const edgeMap = [];
+      for(let r=0;r<rows;r++){
+        edgeMap[r] = [];
+        for(let c=0;c<cols;c++){
+          const top = r===0 ? 0 : -edgeMap[r-1][c].bottom;
+          const left = c===0 ? 0 : -edgeMap[r][c-1].right;
+          const right = c===cols-1 ? 0 : (Math.random() > .5 ? 1 : -1);
+          const bottom = r===rows-1 ? 0 : (Math.random() > .5 ? 1 : -1);
+          edgeMap[r][c] = {top,right,bottom,left};
+        }
+      }
+
+      function createPieceGeometry(edges, baseW, baseH, r){
+        const extTop = edges.top === -1 ? r : 0;
+        const extRight = edges.right === 1 ? r : 0;
+        const extBottom = edges.bottom === 1 ? r : 0;
+        const extLeft = edges.left === -1 ? r : 0;
+
+        const fullW = baseW + extLeft + extRight;
+        const fullH = baseH + extTop + extBottom;
+
+        const x0 = extLeft; const y0 = extTop;
+        const x1 = x0 + baseW; const y1 = y0 + baseH;
+        const midX = x0 + baseW / 2; const midY = y0 + baseH / 2;
+
+        let d = `M ${x0} ${y0}`;
+        if(edges.top === 0) d += ` L ${x1} ${y0}`;
+        else{ d += ` L ${midX - r} ${y0} ${edges.top === 1 ? `A ${r} ${r} 0 0 1 ${midX + r} ${y0}` : `A ${r} ${r} 0 0 0 ${midX + r} ${y0}`} L ${x1} ${y0}`; }
+        
+        if(edges.right === 0) d += ` L ${x1} ${y1}`;
+        else{ d += ` L ${x1} ${midY - r} ${edges.right === 1 ? `A ${r} ${r} 0 0 1 ${x1} ${midY + r}` : `A ${r} ${r} 0 0 0 ${x1} ${midY + r}`} L ${x1} ${y1}`; }
+        
+        if(edges.bottom === 0) d += ` L ${x0} ${y1}`;
+        else{ d += ` L ${midX + r} ${y1} ${edges.bottom === 1 ? `A ${r} ${r} 0 0 1 ${midX - r} ${y1}` : `A ${r} ${r} 0 0 0 ${midX - r} ${y1}`} L ${x0} ${y1}`; }
+        
+        if(edges.left === 0) d += ` L ${x0} ${y0}`;
+        else{ d += ` L ${x0} ${midY + r} ${edges.left === 1 ? `A ${r} ${r} 0 0 1 ${x0} ${midY - r}` : `A ${r} ${r} 0 0 0 ${x0} ${midY - r}`} L ${x0} ${y0}`; }
+        
+        d += ` Z`;
+
+        return { path: d, fullW, fullH, extTop, extRight, extBottom, extLeft, baseW, baseH };
+      }
+
+      function createTextMarkup(geometry, text, isTask){
+        const pctX = ((geometry.extLeft + geometry.baseW / 2) / geometry.fullW) * 100;
+        const pctY = ((geometry.extTop + geometry.baseH / 2) / geometry.fullH) * 100;
+        const pctW = (geometry.baseW / geometry.fullW) * 85;
+        const pctH = (geometry.baseH / geometry.fullH) * 85;
+        
+        const bgClass = (isTask ? config.textBgTask : config.textBgAnswer) ? "has-bg" : "";
+        const strokeClass = (isTask ? config.textStrokeTask : config.textStrokeAnswer) ? "stroke" : "";
+        const fSize = isTask ? config.fontSizeTask : config.fontSizeAnswer;
+
+        return `
+          <div class="text-wrap-center" style="left:${pctX}%; top:${pctY}%; width:${pctW}%; height:${pctH}%;">
+            <div class="text-inner ${bgClass} ${strokeClass}" style="font-family:${escapeHtml(config.fontFamily)};font-size:${fSize}px;">
+              ${escapeHtml(text)}
+            </div>
+          </div>
+        `;
+      }
+
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+          const i = r * cols + c;
+          const edges = edgeMap[r][c];
+          const geometry = createPieceGeometry(edges, cellW, cellH, radius);
+          const slotX = c * cellW - geometry.extLeft;
+          const slotY = r * cellH - geometry.extTop;
+
+          const slot = document.createElement("div");
+          slot.className = "piece-slot";
+          slot.style.left = slotX + "px"; slot.style.top = slotY + "px";
+          slot.style.width = geometry.fullW + "px"; slot.style.height = geometry.fullH + "px";
+          slot.innerHTML = `
+            <svg class="slot-svg" viewBox="0 0 ${geometry.fullW} ${geometry.fullH}" preserveAspectRatio="none">
+              <path d="${geometry.path}" fill="rgba(255,255,255,.11)" stroke="rgba(255,255,255,.38)" stroke-width="2.3"></path>
+              <path d="${geometry.path}" fill="none" stroke="rgba(15,23,42,.18)" stroke-width="6"></path>
+            </svg>
+            ${createTextMarkup(geometry, config.tasks[i].task, true)}
+          `;
+          board.appendChild(slot);
+          slots.push(slot);
+
+          const piece = document.createElement("div");
+          piece.className = "piece";
+          piece.dataset.index = i;
+          
+          piece.style.width = geometry.fullW + "px";
+          piece.style.height = geometry.fullH + "px";
+          
+          piece.innerHTML = `
+            <svg class="piece-svg" viewBox="0 0 ${geometry.fullW} ${geometry.fullH}" preserveAspectRatio="none">
+              <defs>
+                <clipPath id="clip-${i}"><path d="${geometry.path}"></path></clipPath>
+                <linearGradient id="shine-${i}" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(255,255,255,.26)"></stop>
+                  <stop offset="45%" stop-color="rgba(255,255,255,0)"></stop>
+                  <stop offset="100%" stop-color="rgba(0,0,0,.12)"></stop>
+                </linearGradient>
+              </defs>
+              <g clip-path="url(#clip-${i})">
+                <image href="${escapeHtml(config.imageUrl)}" x="${geometry.extLeft - (c * cellW)}" y="${geometry.extTop - (r * cellH)}"
+                  width="${config.boardWidth}" height="${config.boardHeight}" preserveAspectRatio="none"></image>
+                <rect x="0" y="0" width="${geometry.fullW}" height="${geometry.fullH}" fill="url(#shine-${i})"></rect>
+              </g>
+              <path class="piece-stroke" d="${geometry.path}" fill="none" stroke="rgba(255,255,255,.42)" stroke-width="2.1"></path>
+              <path class="piece-stroke" d="${geometry.path}" fill="none" stroke="rgba(15,23,42,.17)" stroke-width="5"></path>
+            </svg>
+            ${createTextMarkup(geometry, config.tasks[i].answer, false)}
+          `;
+          pieces.push(piece);
+
+          pieceModels.push({
+            index: i, geometry, boardX: slotX, boardY: slotY,
+            trayX: 0, trayY: 0, trayScale: 1
+          });
+        }
+      }
+
+      const leftTrayRect = { x: SCENE_PAD, y: SCENE_PAD, w: TRAY_W, h: TRAY_H };
+      const rightTrayRect = { x: 1200 - SCENE_PAD - TRAY_W, y: SCENE_PAD, w: TRAY_W, h: TRAY_H };
+
+      const shellX = SCENE_PAD + TRAY_W + SCENE_GAP;
+      const boardX = shellX + (SHELL_W - config.boardWidth) / 2;
+      const boardY = SCENE_PAD + (SHELL_H - config.boardHeight) / 2;
+
+      function scatterPieces(){
+        const shuffled = [...pieces].map((piece, idx)=>({piece, idx})).sort(()=>Math.random()-0.5);
+        const leftCount = Math.ceil(shuffled.length / 2);
+        const leftSet = shuffled.slice(0, leftCount);
+        const rightSet = shuffled.slice(leftCount);
+
+        const maxPieceW = cellW + radius * 2;
+        const maxPieceH = cellH + radius * 2;
+
+        function layoutTray(set, trayRect){
+          if(set.length === 0) return;
+          const count = set.length;
+          
+          const safeW = trayRect.w - 24; 
+          const safeH = (trayRect.h / count) - 16;
+
+          const baseScale = Math.min(safeW / maxPieceW, safeH / maxPieceH, 1);
+
+          set.forEach(({piece, idx}, i)=>{
+            piecesLayer.appendChild(piece);
+            const model = pieceModels[idx];
+            
+            const pw = model.geometry.fullW * baseScale;
+            const ph = model.geometry.fullH * baseScale;
+
+            const localX = (trayRect.w - pw) / 2;
+            const localY = (trayRect.h / count) * i + ((trayRect.h / count) - ph) / 2;
+
+            model.trayX = trayRect.x + localX;
+            model.trayY = trayRect.y + localY;
+            model.trayScale = baseScale;
+
+            piece.style.left = model.trayX + "px";
+            piece.style.top = model.trayY + "px";
+            piece.style.transform = `scale(${baseScale})`;
+          });
         }
 
-        function closeModal() { document.getElementById('code-modal').style.display = 'none'; }
-        function copyCode() { document.getElementById('iframe-code').select(); document.execCommand('copy'); alert('Код скопирован!'); }
+        layoutTray(leftSet, leftTrayRect);
+        layoutTray(rightSet, rightTrayRect);
+      }
+      requestAnimationFrame(scatterPieces);
 
-        let placedCount = 0;
-        let totalCount = 0;
+      function playTone(type="correct"){
+        if(type==="correct" && !config.correctSound) return;
+        if(type==="win" && !config.winSound) return;
+        try{
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          if(type==="correct"){
+            const o1 = ctx.createOscillator(); const g = ctx.createGain();
+            o1.connect(g); g.connect(ctx.destination);
+            o1.type = "sine"; o1.frequency.setValueAtTime(740, ctx.currentTime);
+            o1.frequency.exponentialRampToValueAtTime(1040, ctx.currentTime + 0.12);
+            g.gain.setValueAtTime(0.001, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+            o1.start(); o1.stop(ctx.currentTime + 0.2);
+          }else{
+            [523.25,659.25,783.99,1046.5].forEach((n,idx)=>{
+              const o = ctx.createOscillator(); const g = ctx.createGain();
+              o.type = "triangle"; o.frequency.value = n;
+              o.connect(g); g.connect(ctx.destination);
+              const start = ctx.currentTime + idx * 0.08;
+              g.gain.setValueAtTime(0.001, start);
+              g.gain.exponentialRampToValueAtTime(0.12, start + 0.02);
+              g.gain.exponentialRampToValueAtTime(0.001, start + 0.26);
+              o.start(start); o.stop(start + 0.28);
+            });
+          }
+        }catch(e){}
+      }
 
-        function getPuzzlePath(w, h, t, r, b, l) {
-            const s = Math.min(w, h) * 0.2; let p = `M 0 0`;
-            p += t == 0 ? `L${w} 0` : `L${w/2-s} 0C${w/2-s},${-t*s*1.5},${w/2+s},${-t*s*1.5},${w/2+s},0L${w} 0`;
-            p += r == 0 ? `L${w},${h}` : `L${w},${h/2-s}C${w+r*s*1.5},${h/2-s},${w+r*s*1.5},${h/2+s},${w},${h/2+s}L${w},${h}`;
-            p += b == 0 ? `L0,${h}` : `L${w/2+s},${h}C${w/2+s},${h+b*s*1.5},${w/2-s},${h+b*s*1.5},${w/2-s},${h}L0,${h}`;
-            p += l == 0 ? `L0 0` : `L0,${h/2+s}C${-l*s*1.5},${h/2+s},${-l*s*1.5},${h/2-s},0,${h/2-s}L0 0`;
-            return p + 'Z';
+      function launchConfetti(){
+        const stage = root.querySelector(".widget-stage");
+        const colors = ["#f43f5e","#22c55e","#3b82f6","#f59e0b","#a855f7","#06b6d4"];
+        for(let i=0;i<120;i++){
+          const conf = document.createElement("div");
+          conf.className = "confetti";
+          conf.style.left = Math.random() * 100 + "%";
+          conf.style.background = colors[Math.floor(Math.random() * colors.length)];
+          conf.style.transform = `translateY(0) rotate(${Math.random()*180}deg)`;
+          conf.style.animationDuration = (2.2 + Math.random() * 1.8) + "s";
+          conf.style.animationDelay = (Math.random() * 0.4) + "s";
+          stage.appendChild(conf);
+          setTimeout(()=>conf.remove(), 4500);
+        }
+      }
+
+      function completeGame(){
+        pieces.forEach(p => p.classList.add("clean"));
+        slots.forEach(s => s.style.opacity = "0");
+        completeOverlay.classList.add("show");
+        victoryTextTop.classList.add("show");
+        playTone("win"); launchConfetti();
+      }
+
+      function getMouseLogical(e) {
+        const rect = scaleWrap.getBoundingClientRect();
+        const scale = rect.width / 1200;
+        return {
+          x: (e.clientX - rect.left) / scale,
+          y: (e.clientY - rect.top) / scale
+        };
+      }
+
+      pieces.forEach(piece=>{
+        let shiftX = 0, shiftY = 0;
+
+        function onPointerDown(e){
+          if(piece.classList.contains("correct")) return;
+          e.preventDefault();
+
+          const idx = +piece.dataset.index;
+          const model = pieceModels[idx];
+          
+          const pos = getMouseLogical(e);
+
+          const curL = parseFloat(piece.style.left);
+          const curT = parseFloat(piece.style.top);
+
+          shiftX = (pos.x - curL) / model.trayScale;
+          shiftY = (pos.y - curT) / model.trayScale;
+
+          piece.classList.add("dragging");
+          piece.style.transform = 'scale(1)';
+          piece.style.left = (pos.x - shiftX) + "px";
+          piece.style.top = (pos.y - shiftY) + "px";
+
+          window.addEventListener("pointermove", onPointerMove);
+          window.addEventListener("pointerup", onPointerUp);
         }
 
-        function initWidget(config) {
-            // *** ИСПРАВЛЕНИЕ ТАЙМИНГА: Ждем полной загрузки окна ***
-            window.onload = () => {
-                const board = document.getElementById('board-area');
-                const gameContainer = document.getElementById('game-container');
-                document.getElementById('full-image').style.backgroundImage = `url(${config.img})`;
-                totalCount = config.cols * config.rows;
-                gameContainer.style.fontFamily = config.font;
-                gameContainer.style.color = config.color;
-
-                const hTabs = Array.from({length: config.rows + 1}, (_, r) => Array.from({length: config.cols}, () => (r === 0 || r === config.rows) ? 0 : Math.random() > 0.5 ? 1 : -1));
-                const vTabs = Array.from({length: config.rows}, () => Array.from({length: config.cols + 1}, (_, c) => (c === 0 || c === config.cols) ? 0 : Math.random() > 0.5 ? 1 : -1));
-
-                const bw = board.clientWidth, bh = board.clientHeight;
-                const pw = bw / config.cols, ph = bh / config.rows;
-                const tabSize = Math.min(pw, ph) * 0.2 * 2;
-                
-                let pieceData = [];
-                for (let r = 0; r < config.rows; r++) {
-                    for (let c = 0; c < config.cols; c++) {
-                        const index = r * config.cols + c;
-                        const path = getPuzzlePath(pw, ph, hTabs[r][c], vTabs[r][c + 1], hTabs[r + 1][c], vTabs[r][c]);
-                        const viewBox = `${-tabSize} ${-tabSize} ${pw + tabSize*2} ${ph + tabSize*2}`;
-                        
-                        board.innerHTML += `<div class="board-slot" style="width:${pw}px;height:${ph}px;left:${c*pw}px;top:${r*ph}px;"><svg viewBox="${viewBox}" style="left:${-tabSize}px;top:${-tabSize}px;width:${pw+tabSize*2}px;height:${ph+tabSize*2}px;"><path d="${path}" transform="translate(${tabSize},${tabSize})"/></svg><div class="board-task-text">${config.tasks[index]||''}</div></div>`;
-                        
-                        pieceData.push({ id: index, path, viewBox, targetX: c*pw, targetY: r*ph, pw, ph, tabSize });
-                    }
-                }
-
-                pieceData.sort(() => Math.random() - 0.5).forEach((data, i) => {
-                    const pool = i % 2 === 0 ? document.getElementById('pool-left') : document.getElementById('pool-right');
-                    const piece = document.createElement('div');
-                    piece.className = 'puzzle-piece';
-                    piece.id = `piece-${data.id}`;
-                    piece.style.cssText = `width:${data.pw}px;height:${data.ph}px;left:${Math.random()*60+10}%;top:${Math.random()*70+10}%;`;
-                    piece.innerHTML = `<svg viewBox="${data.viewBox}" style="left:${-data.tabSize}px;top:${-data.tabSize}px;width:${data.pw+data.tabSize*2}px;height:${data.ph+data.tabSize*2}px;"><defs><clipPath id="clip-${data.id}"><path d="${data.path}" transform="translate(${data.tabSize},${data.tabSize})"/></clipPath></defs><image href="${config.img}" x="${-data.targetX+data.tabSize}" y="${-data.targetY+data.tabSize}" width="${bw}" height="${bh}" preserveAspectRatio="none" clip-path="url(#clip-${data.id})"/><path class="stroke" d="${data.path}" transform="translate(${data.tabSize},${data.tabSize})"/></svg><div class="puzzle-answer-text" style="background:${config.textBg};text-shadow:${config.textOutline};">${config.answers[data.id]||''}</div>`;
-                    makeDraggable(piece, data.targetX, data.targetY, board);
-                    pool.appendChild(piece);
-                });
-            };
+        function onPointerMove(e){
+          const pos = getMouseLogical(e);
+          piece.style.left = (pos.x - shiftX) + "px";
+          piece.style.top = (pos.y - shiftY) + "px";
         }
 
-        function makeDraggable(el, targetX, targetY, board) {
-            let isDragging = false, startX, startY, initialLeft, initialTop;
-            const container = document.getElementById('game-container');
-            el.onpointerdown = e => {
-                if (el.classList.contains('snapped')) return;
-                isDragging = true;
-                el.setPointerCapture(e.pointerId);
-                if (el.parentElement !== container) {
-                    const rect = el.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
-                    el.style.left = `${rect.left - containerRect.left}px`;
-                    el.style.top = `${rect.top - containerRect.top}px`;
-                    container.appendChild(el);
-                }
-                startX = e.clientX; startY = e.clientY;
-                initialLeft = el.offsetLeft; initialTop = el.offsetTop;
-                el.style.zIndex = 100;
-            };
-            el.onpointermove = e => {
-                if (!isDragging) return;
-                const rect = container.getBoundingClientRect(), scaleX = rect.width / container.offsetWidth;
-                el.style.left = `${initialLeft + (e.clientX - startX) / scaleX}px`;
-                el.style.top = `${initialTop + (e.clientY - startY) / (rect.height / container.offsetHeight)}px`;
-            };
-            el.onpointerup = e => {
-                if (!isDragging) return;
-                isDragging = false;
-                el.releasePointerCapture(e.pointerId);
-                el.style.zIndex = '';
-                const boardRect = board.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
-                const scaleX = containerRect.width / container.offsetWidth, elRect = el.getBoundingClientRect();
-                const relX = (elRect.left - boardRect.left) / scaleX, relY = (elRect.top - boardRect.top) / (containerRect.height / container.offsetHeight);
+        function onPointerUp(){
+          window.removeEventListener("pointermove", onPointerMove);
+          window.removeEventListener("pointerup", onPointerUp);
+          piece.classList.remove("dragging");
 
-                if (Math.abs(relX - targetX) < 30 && Math.abs(relY - targetY) < 30) {
-                    board.appendChild(el);
-                    el.style.left = `${targetX}px`; el.style.top = `${targetY}px`;
-                    el.classList.add('snapped', 'glow-effect');
-                    playSound('snap');
-                    setTimeout(() => el.classList.remove('glow-effect'), 800);
-                    
-                    document.querySelectorAll('.board-slot').forEach(slot => {
-                        if (Math.abs(slot.offsetLeft - targetX) < 1 && Math.abs(slot.offsetTop - targetY) < 1) slot.style.opacity = 0;
-                    });
+          const idx = +piece.dataset.index;
+          const model = pieceModels[idx];
+          const slot = slots[idx];
+          
+          const targetX = boardX + model.boardX;
+          const targetY = boardY + model.boardY;
 
-                    if (++placedCount === totalCount) handleWin();
-                }
-            };
+          const curX = parseFloat(piece.style.left);
+          const curY = parseFloat(piece.style.top);
+
+          const dx = Math.abs(curX - targetX);
+          const dy = Math.abs(curY - targetY);
+
+          if(dx <= 45 && dy <= 45 && !placed.has(idx)){
+            piece.style.left = targetX + "px";
+            piece.style.top = targetY + "px";
+            piece.classList.add("correct", "shine");
+            setTimeout(()=>piece.classList.remove("shine"), 700);
+            
+            const taskEl = slot.querySelector(".text-wrap-center");
+            if(taskEl) taskEl.style.opacity = "0";
+
+            slot.classList.add("correct");
+            placed.add(idx); correctCount++; playTone("correct");
+
+            if(correctCount === total) setTimeout(completeGame, 450);
+          }else{
+            piece.style.left = model.trayX + "px";
+            piece.style.top = model.trayY + "px";
+            piece.style.transform = `scale(${model.trayScale})`;
+          }
         }
+        piece.addEventListener("pointerdown", onPointerDown);
+      });
+    }
 
-        function handleWin() {
-            playSound('win');
-            const end = Date.now() + 3000;
-            (function frame() {
-                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0, y: 0.8 }, colors: ['#6C5CE7', '#00cec9', '#fdcb6e', '#ff7675'] });
-                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1, y: 0.8 }, colors: ['#6C5CE7', '#00cec9', '#fdcb6e', '#ff7675'] });
-                if (Date.now() < end) requestAnimationFrame(frame);
-            }());
-            document.getElementById('board-area').classList.add('board-glow');
-            document.getElementById('full-image').style.opacity = 1;
-            document.querySelectorAll('.puzzle-piece').forEach(p => p.style.opacity = 0);
-        }
-    </script>
+    (async function init(){
+      const { mode, config } = getModeAndConfig();
+      if(mode === "widget") await createWidget(config); else createEditor(config);
+    })();
+  </script>
 </body>
 </html>
