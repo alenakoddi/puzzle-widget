@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Пазл с заданиями | Easy for busy</title>
+    <!-- Подключение шрифтов -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Comfortaa:wght@400;700&family=Caveat:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Библиотека конфетти -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #6C5CE7;
+            --primary-hover: #5b4bc4;
+            --bg: #f3f4f6;
+            --panel: #ffffff;
+            --text: #2d3436;
+            --shadow: 8px 8px 16px #d1d5db, -8px -8px 16px #ffffff;
+            --shadow-inset: inset 4px 4px 8px #d1d5db, inset -4px -4px 8px #ffffff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Roboto', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+        /* --- СТИЛИ РЕДАКТОРА --- */
+        #editor-view { display: flex; flex-direction: column; min-height: 100vh; padding: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-family: 'Comfortaa', cursive; color: var(--primary); text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        
+        .editor-container { display: flex; gap: 20px; flex: 1; max-width: 1600px; margin: 0 auto; width: 100%; height: calc(100vh - 150px); }
+        
+        .settings-panel { 
+            width: 400px; background: var(--panel); border-radius: 20px; padding: 20px; 
+            box-shadow: var(--shadow); overflow-y: auto; display: flex; flex-direction: column; gap: 15px; 
+        }
+        
+        .preview-panel { 
+            flex: 1; background: var(--panel); border-radius: 20px; padding: 20px; 
+            box-shadow: var(--shadow); display: flex; flex-direction: column; 
+        }
+
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: bold; font-size: 0.9em; color: #555; }
+        input[type="text"], input[type="color"], select { 
+            padding: 10px; border: none; border-radius: 10px; background: var(--bg); box-shadow: var(--shadow-inset); 
+            font-family: inherit; width: 100%; outline: none; transition: 0.3s;
+        }
+        input[type="text"]:focus { box-shadow: inset 6px 6px 12px #d1d5db, inset -6px -6px 12px #ffffff, 0 0 0 2px var(--primary); }
+        
+        .pair-container { background: #f9f9f9; padding: 10px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 10px; }
+        .pair-container h4 { margin-bottom: 5px; font-size: 0.85em; color: var(--primary); }
+
+        button { 
+            padding: 12px 20px; background: var(--primary); color: white; border: none; border-radius: 12px; 
+            font-weight: bold; cursor: pointer; box-shadow: 4px 4px 10px rgba(108, 92, 231, 0.4); 
+            transition: 0.2s; font-family: 'Comfortaa', cursive;
+        }
+        button:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 6px 6px 12px rgba(108, 92, 231, 0.5); }
+        button:active { transform: translateY(0); }
+
+        .preview-wrapper { 
+            flex: 1; border-radius: 15px; overflow: hidden; box-shadow: var(--shadow-inset); 
+            position: relative; background: #eee; 
+        }
+        iframe { width: 100%; height: 100%; border: none; }
+
+        /* Модальное окно */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 30px; border-radius: 20px; width: 600px; max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; }
+        .modal-content textarea { width: 100%; height: 150px; margin: 15px 0; padding: 10px; border-radius: 10px; border: 1px solid #ccc; font-family: monospace; resize: none; }
+        .close-btn { background: #ff7675; margin-left: 10px; }
+        .close-btn:hover { background: #d63031; }
+
+        /* Футер */
+        .footer { text-align: center; margin-top: 15px; font-size: 0.85em; color: #7f8c8d; }
+        .footer a { color: var(--primary); text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; margin: 0 5px; }
+        .footer a:hover { text-decoration: underline; }
+        .footer img { width: 16px; height: 16px; }
+
+        /* --- СТИЛИ ВИДЖЕТА --- */
+        #widget-view { display: none; width: 100vw; height: 100vh; background: transparent; position: relative; overflow: hidden; }
+        
+        .game-container { 
+            width: 100%; height: 100%; position: relative; 
+            max-width: calc(100vh * 16 / 9); max-height: calc(100vw * 9 / 16);
+            margin: auto; top: 50%; transform: translateY(-50%);
+        }
+
+        .board-area { 
+            position: absolute; left: 25%; top: 15%; width: 50%; height: 70%;
+            background: rgba(255, 255, 255, 0.2); border-radius: 10px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: all 1s ease;
+        }
+
+        .board-glow { box-shadow: 0 0 40px 10px rgba(255, 215, 0, 0.8) !important; border: none !important; }
+        .full-image-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-size: 100% 100%; border-radius: 10px; opacity: 0; transition: opacity 1.5s ease; z-index: 100; pointer-events: none;
+        }
+
+        .pool-left { position: absolute; left: 2%; top: 5%; width: 21%; height: 90%; }
+        .pool-right { position: absolute; right: 2%; top: 5%; width: 21%; height: 90%; }
+
+        .board-slot { position: absolute; display: flex; justify-content: center; align-items: center; text-align: center; }
+        .board-slot svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+        .board-slot path { fill: rgba(255,255,255,0.4); stroke: #ccc; stroke-width: 2px; stroke-dasharray: 5,5; }
+        .board-task-text { position: relative; z-index: 2; padding: 5px; word-wrap: break-word; user-select: none; max-width: 80%; max-height: 80%; overflow: hidden; font-size: clamp(10px, 1.5vw, 16px); }
+
+        .puzzle-piece { 
+            position: absolute; display: flex; justify-content: center; align-items: center; text-align: center;
+            cursor: grab; filter: drop-shadow(3px 5px 5px rgba(0,0,0,0.4)); transition: transform 0.1s;
+            transform-origin: center; touch-action: none;
+        }
+        .puzzle-piece:active { cursor: grabbing; transform: scale(1.05); filter: drop-shadow(5px 8px 10px rgba(0,0,0,0.5)); z-index: 50 !important; }
+        .puzzle-piece.snapped { cursor: default; transform: none !important; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); z-index: 10 !important; }
+        
+        .puzzle-piece svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+        .puzzle-piece image { pointer-events: none; }
+        .puzzle-piece path.stroke { fill: none; stroke: rgba(255,255,255,0.5); stroke-width: 1px; }
+        
+        .puzzle-answer-text { position: relative; z-index: 2; padding: 5px; word-wrap: break-word; user-select: none; pointer-events: none; max-width: 80%; max-height: 80%; overflow: hidden; border-radius: 5px; font-size: clamp(10px, 1.5vw, 16px); }
+
+        @keyframes pulse-glow {
+            0% { filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 10px #74b9ff); }
+            50% { filter: drop-shadow(0 0 15px #fff) drop-shadow(0 0 30px #0984e3); }
+            100% { filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5)); }
+        }
+        .glow-effect { animation: pulse-glow 0.8s ease-out; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="editor-view">
+        <div class="header"><h1>3D Пазл Конструктор</h1></div>
+        <div class="editor-container">
+            <div class="settings-panel" id="settings">
+                <div class="form-group">
+                    <label>Ссылка на картинку (прямая):</label>
+                    <input type="text" id="img-url" value="https://cdn.creazilla.com/photos/1415199/carving-halloween-pumpkin-photo-md.jpeg">
+                </div>
+                <div class="form-group">
+                    <label>Количество деталей:</label>
+                    <select id="grid-size">
+                        <option value="3x3">Крупные (9 деталей)</option>
+                        <option value="4x3" selected>Средние (12 деталей)</option>
+                        <option value="5x3">Мелкие (15 деталей)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Шрифт текста:</label>
+                    <select id="font-family">
+                        <option value="'Roboto', sans-serif">Roboto (Классический)</option>
+                        <option value="'Comfortaa', cursive" selected>Comfortaa (Круглый)</option>
+                        <option value="'Caveat', cursive">Caveat (Рукописный)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Цвет текста:</label>
+                    <input type="color" id="text-color" value="#FFFFFF">
+                </div>
+                <div class="form-group">
+                    <label>Фон под текстом ответа (rgba/hex):</label>
+                    <input type="text" id="text-bg" value="rgba(0, 0, 0, 0.5)">
+                </div>
+                <div class="form-group">
+                    <label>Обводка текста ответа (CSS text-shadow):</label>
+                    <input type="text" id="text-outline" value="1px 1px 2px black">
+                </div>
+                <hr style="border:0; border-top:1px solid #ccc; margin: 10px 0;">
+                <label>Задания и Ответы:</label>
+                <div id="qa-container"></div>
+                <button onclick="openModal()" style="margin-top: 10px;">Получить код iframe</button>
+            </div>
+            <div class="preview-panel">
+                <label style="margin-bottom: 10px;">Предпросмотр (в реальном времени):</label>
+                <div class="preview-wrapper">
+                    <iframe id="preview-frame"></iframe>
+                </div>
+            </div>
+        </div>
+        <div class="footer">
+            Автор: Кóденцева Алёна, блог Просто для учителя | Easy for busy <br>
+            <a href="https://t.me/easyfrbusy" target="_blank"><img src="https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" alt="TG"> Telegram</a>
+            <a href="https://vk.com/easyfrbusy" target="_blank"><img src="https://upload.wikimedia.org/wikipedia/commons/2/21/VK.com-logo.svg" alt="VK"> ВКонтакте</a>
+        </div>
+    </div>
+
+    <div id="code-modal" class="modal">
+        <div class="modal-content">
+            <h2 style="font-family: 'Comfortaa', cursive; color: var(--primary);">Ваш код виджета</h2>
+            <p style="margin-top:10px; font-size:0.9em; color:#555;">Скопируйте этот код и вставьте его в Genially (Insert -> Other) или Miro (Embed code).</p>
+            <textarea id="iframe-code" readonly></textarea>
+            <div>
+                <button onclick="copyCode()">Скопировать код</button>
+                <button class="close-btn" onclick="closeModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="widget-view">
+        <div class="game-container" id="game-container">
+            <div class="pool-left" id="pool-left"></div>
+            <div class="board-area" id="board-area"><div class="full-image-overlay" id="full-image"></div></div>
+            <div class="pool-right" id="pool-right"></div>
+        </div>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (type === 'snap') {
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.connect(gainNode).connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'win') {
+                [440, 554.37, 659.25, 880].forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0, audioCtx.currentTime + i * 0.1);
+                    gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + i * 0.1 + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.5);
+                    osc.connect(gain).connect(audioCtx.destination);
+                    osc.start(audioCtx.currentTime + i * 0.1);
+                    osc.stop(audioCtx.currentTime + i * 0.1 + 0.6);
+                });
+            }
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const configParam = urlParams.get('config');
+
+        if (configParam) {
+            document.getElementById('editor-view').classList.add('hidden');
+            document.getElementById('widget-view').style.display = 'block';
+            try {
+                const config = JSON.parse(decodeURIComponent(atob(configParam)));
+                initWidget(config);
+            } catch(e) { console.error("Ошибка чтения настроек", e); }
+        } else {
+            initEditor();
+        }
+
+        let updateTimeout;
+        function initEditor() {
+            document.getElementById('grid-size').addEventListener('change', generateQAFields);
+            document.querySelectorAll('#settings input, #settings select').forEach(input => input.addEventListener('input', scheduleUpdate));
+            generateQAFields();
+        }
+
+        function generateQAFields() {
+            const container = document.getElementById('qa-container');
+            const [cols, rows] = document.getElementById('grid-size').value.split('x').map(Number);
+            const count = cols * rows;
+            const currentTasks = Array.from(document.querySelectorAll('.task-input')).map(el => el.value);
+            const currentAnswers = Array.from(document.querySelectorAll('.ans-input')).map(el => el.value);
+            container.innerHTML = '';
+            for (let i = 0; i < count; i++) {
+                container.innerHTML += `
+                    <div class="pair-container">
+                        <h4>Пазлинка ${i+1}</h4>
+                        <div class="form-group">
+                            <input type="text" class="task-input" placeholder="Задание (на доске)" value="${currentTasks[i] || `Задание ${i+1}`}">
+                            <input type="text" class="ans-input" placeholder="Ответ (на пазлинке)" value="${currentAnswers[i] || `Ответ ${i+1}`}">
+                        </div>
+                    </div>`;
+            }
+            container.querySelectorAll('input').forEach(input => input.addEventListener('input', scheduleUpdate));
+            scheduleUpdate();
+        }
+
+        function scheduleUpdate() { clearTimeout(updateTimeout); updateTimeout = setTimeout(updatePreview, 500); }
+        
+        function getBaseUrl() { return window.location.href.split('?')[0]; }
+
+        function getCurrentConfig() {
+            const [cols, rows] = document.getElementById('grid-size').value.split('x').map(Number);
+            // *** ИСПРАВЛЕНИЕ CORS: Оборачиваем URL в прокси ***
+            const originalUrl = document.getElementById('img-url').value;
+            const proxiedUrl = `https://corsproxy.io/?${encodeURIComponent(originalUrl)}`;
+
+            return {
+                img: proxiedUrl, // Используем обработанную ссылку
+                cols: cols, rows: rows,
+                font: document.getElementById('font-family').value,
+                color: document.getElementById('text-color').value,
+                textBg: document.getElementById('text-bg').value,
+                textOutline: document.getElementById('text-outline').value,
+                tasks: Array.from(document.querySelectorAll('.task-input')).map(el => el.value),
+                answers: Array.from(document.querySelectorAll('.ans-input')).map(el => el.value)
+            };
+        }
+
+        function updatePreview() {
+            const config = getCurrentConfig();
+            const base64Config = btoa(encodeURIComponent(JSON.stringify(config)));
+            document.getElementById('preview-frame').src = `${getBaseUrl()}?config=${base64Config}`;
+        }
+
+        function openModal() {
+            const config = getCurrentConfig();
+            const base64Config = btoa(encodeURIComponent(JSON.stringify(config)));
+            const fullUrl = `${getBaseUrl()}?config=${base64Config}`;
+            document.getElementById('iframe-code').value = `<iframe src="${fullUrl}" width="1200" height="675" style="border:none; background:transparent;" allow="autoplay" allowfullscreen></iframe>`;
+            document.getElementById('code-modal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('code-modal').style.display = 'none'; }
+        function copyCode() { document.getElementById('iframe-code').select(); document.execCommand('copy'); alert('Код скопирован!'); }
+
+        let placedCount = 0;
+        let totalCount = 0;
+
+        function getPuzzlePath(w, h, t, r, b, l) {
+            const s = Math.min(w, h) * 0.2; let p = `M 0 0`;
+            p += t == 0 ? `L${w} 0` : `L${w/2-s} 0C${w/2-s},${-t*s*1.5},${w/2+s},${-t*s*1.5},${w/2+s},0L${w} 0`;
+            p += r == 0 ? `L${w},${h}` : `L${w},${h/2-s}C${w+r*s*1.5},${h/2-s},${w+r*s*1.5},${h/2+s},${w},${h/2+s}L${w},${h}`;
+            p += b == 0 ? `L0,${h}` : `L${w/2+s},${h}C${w/2+s},${h+b*s*1.5},${w/2-s},${h+b*s*1.5},${w/2-s},${h}L0,${h}`;
+            p += l == 0 ? `L0 0` : `L0,${h/2+s}C${-l*s*1.5},${h/2+s},${-l*s*1.5},${h/2-s},0,${h/2-s}L0 0`;
+            return p + 'Z';
+        }
+
+        function initWidget(config) {
+            // *** ИСПРАВЛЕНИЕ ТАЙМИНГА: Ждем полной загрузки окна ***
+            window.onload = () => {
+                const board = document.getElementById('board-area');
+                const gameContainer = document.getElementById('game-container');
+                document.getElementById('full-image').style.backgroundImage = `url(${config.img})`;
+                totalCount = config.cols * config.rows;
+                gameContainer.style.fontFamily = config.font;
+                gameContainer.style.color = config.color;
+
+                const hTabs = Array.from({length: config.rows + 1}, (_, r) => Array.from({length: config.cols}, () => (r === 0 || r === config.rows) ? 0 : Math.random() > 0.5 ? 1 : -1));
+                const vTabs = Array.from({length: config.rows}, () => Array.from({length: config.cols + 1}, (_, c) => (c === 0 || c === config.cols) ? 0 : Math.random() > 0.5 ? 1 : -1));
+
+                const bw = board.clientWidth, bh = board.clientHeight;
+                const pw = bw / config.cols, ph = bh / config.rows;
+                const tabSize = Math.min(pw, ph) * 0.2 * 2;
+                
+                let pieceData = [];
+                for (let r = 0; r < config.rows; r++) {
+                    for (let c = 0; c < config.cols; c++) {
+                        const index = r * config.cols + c;
+                        const path = getPuzzlePath(pw, ph, hTabs[r][c], vTabs[r][c + 1], hTabs[r + 1][c], vTabs[r][c]);
+                        const viewBox = `${-tabSize} ${-tabSize} ${pw + tabSize*2} ${ph + tabSize*2}`;
+                        
+                        board.innerHTML += `<div class="board-slot" style="width:${pw}px;height:${ph}px;left:${c*pw}px;top:${r*ph}px;"><svg viewBox="${viewBox}" style="left:${-tabSize}px;top:${-tabSize}px;width:${pw+tabSize*2}px;height:${ph+tabSize*2}px;"><path d="${path}" transform="translate(${tabSize},${tabSize})"/></svg><div class="board-task-text">${config.tasks[index]||''}</div></div>`;
+                        
+                        pieceData.push({ id: index, path, viewBox, targetX: c*pw, targetY: r*ph, pw, ph, tabSize });
+                    }
+                }
+
+                pieceData.sort(() => Math.random() - 0.5).forEach((data, i) => {
+                    const pool = i % 2 === 0 ? document.getElementById('pool-left') : document.getElementById('pool-right');
+                    const piece = document.createElement('div');
+                    piece.className = 'puzzle-piece';
+                    piece.id = `piece-${data.id}`;
+                    piece.style.cssText = `width:${data.pw}px;height:${data.ph}px;left:${Math.random()*60+10}%;top:${Math.random()*70+10}%;`;
+                    piece.innerHTML = `<svg viewBox="${data.viewBox}" style="left:${-data.tabSize}px;top:${-data.tabSize}px;width:${data.pw+data.tabSize*2}px;height:${data.ph+data.tabSize*2}px;"><defs><clipPath id="clip-${data.id}"><path d="${data.path}" transform="translate(${data.tabSize},${data.tabSize})"/></clipPath></defs><image href="${config.img}" x="${-data.targetX+data.tabSize}" y="${-data.targetY+data.tabSize}" width="${bw}" height="${bh}" preserveAspectRatio="none" clip-path="url(#clip-${data.id})"/><path class="stroke" d="${data.path}" transform="translate(${data.tabSize},${data.tabSize})"/></svg><div class="puzzle-answer-text" style="background:${config.textBg};text-shadow:${config.textOutline};">${config.answers[data.id]||''}</div>`;
+                    makeDraggable(piece, data.targetX, data.targetY, board);
+                    pool.appendChild(piece);
+                });
+            };
+        }
+
+        function makeDraggable(el, targetX, targetY, board) {
+            let isDragging = false, startX, startY, initialLeft, initialTop;
+            const container = document.getElementById('game-container');
+            el.onpointerdown = e => {
+                if (el.classList.contains('snapped')) return;
+                isDragging = true;
+                el.setPointerCapture(e.pointerId);
+                if (el.parentElement !== container) {
+                    const rect = el.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
+                    el.style.left = `${rect.left - containerRect.left}px`;
+                    el.style.top = `${rect.top - containerRect.top}px`;
+                    container.appendChild(el);
+                }
+                startX = e.clientX; startY = e.clientY;
+                initialLeft = el.offsetLeft; initialTop = el.offsetTop;
+                el.style.zIndex = 100;
+            };
+            el.onpointermove = e => {
+                if (!isDragging) return;
+                const rect = container.getBoundingClientRect(), scaleX = rect.width / container.offsetWidth;
+                el.style.left = `${initialLeft + (e.clientX - startX) / scaleX}px`;
+                el.style.top = `${initialTop + (e.clientY - startY) / (rect.height / container.offsetHeight)}px`;
+            };
+            el.onpointerup = e => {
+                if (!isDragging) return;
+                isDragging = false;
+                el.releasePointerCapture(e.pointerId);
+                el.style.zIndex = '';
+                const boardRect = board.getBoundingClientRect(), containerRect = container.getBoundingClientRect();
+                const scaleX = containerRect.width / container.offsetWidth, elRect = el.getBoundingClientRect();
+                const relX = (elRect.left - boardRect.left) / scaleX, relY = (elRect.top - boardRect.top) / (containerRect.height / container.offsetHeight);
+
+                if (Math.abs(relX - targetX) < 30 && Math.abs(relY - targetY) < 30) {
+                    board.appendChild(el);
+                    el.style.left = `${targetX}px`; el.style.top = `${targetY}px`;
+                    el.classList.add('snapped', 'glow-effect');
+                    playSound('snap');
+                    setTimeout(() => el.classList.remove('glow-effect'), 800);
+                    
+                    document.querySelectorAll('.board-slot').forEach(slot => {
+                        if (Math.abs(slot.offsetLeft - targetX) < 1 && Math.abs(slot.offsetTop - targetY) < 1) slot.style.opacity = 0;
+                    });
+
+                    if (++placedCount === totalCount) handleWin();
+                }
+            };
+        }
+
+        function handleWin() {
+            playSound('win');
+            const end = Date.now() + 3000;
+            (function frame() {
+                confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0, y: 0.8 }, colors: ['#6C5CE7', '#00cec9', '#fdcb6e', '#ff7675'] });
+                confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1, y: 0.8 }, colors: ['#6C5CE7', '#00cec9', '#fdcb6e', '#ff7675'] });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+            document.getElementById('board-area').classList.add('board-glow');
+            document.getElementById('full-image').style.opacity = 1;
+            document.querySelectorAll('.puzzle-piece').forEach(p => p.style.opacity = 0);
+        }
+    </script>
+</body>
+</html>
